@@ -57,11 +57,13 @@ def get_links_by_flow_by_ttl(replies: List[Reply]) -> Dict[int, Dict[Flow, Set[L
 
 
 def get_links_by_ttl(replies: List[Reply]) -> Dict[int, Set[Link]]:
-    links_by_ttl = defaultdict(set)
+    # links_by_ttl = defaultdict(set)
+    links_by_ttl = defaultdict(list)
     pairs_by_flow = get_pairs_by_flow(replies)
     for flow, pairs in pairs_by_flow.items():
         for near_ttl, near_reply, far_reply in pairs:
-            links_by_ttl[near_ttl].add(
+            # links_by_ttl[near_ttl].add(
+            links_by_ttl[near_ttl].append(
                 (
                     near_ttl,
                     near_reply.reply_src_addr if near_reply else None,

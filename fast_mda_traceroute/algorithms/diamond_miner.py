@@ -3,12 +3,15 @@ from math import ceil
 from random import shuffle
 from typing import Dict, List, Set
 
+from collections import Counter
+
 from diamond_miner.generators import probe_generator
 from diamond_miner.mappers import SequentialFlowMapper
 from diamond_miner.typing import Probe
 from more_itertools import flatten
 from pycaracal import Reply
 
+from fast_mda_traceroute.logger import logger
 from fast_mda_traceroute.algorithms.utils.stopping_point import stopping_point
 from fast_mda_traceroute.links import get_links_by_ttl
 from fast_mda_traceroute.typing import Link
@@ -88,15 +91,25 @@ class DiamondMiner:
         # total number of observations of links reaching nodes at the current ttl.
         # since links are stored with the 'near_ttl',
         # we need to fetch them at ttl-1
-        all_replies = len(self.links_by_ttl.get(ttl - 1, []))
+        # all_replies = len(self.links_by_ttl.get(ttl - 1, []))
+        link_dist = {node: node_replies(node, ttl) for node in nodes}
+        total = sum(link_dist.values())
+        if total:
+            link_dist = {k: v / total for k, v in link_dist.items()}
 
-        if all_replies:
-            # compute the probability distribution of nodes at the current ttl
-            link_dist = {node: node_replies(node, ttl) / all_replies for node in nodes}
+            # if all_replies:
+            #     # compute the probability distribution of nodes at the current ttl
+            #     link_dist = {node: node_replies(node, ttl) for node in nodes}
+            #     logger.debug(
+            #         "link_dist at ttl (abs) %d: %s / total: %d", ttl, link_dist, all_replies
+            #     )
+            #     link_dist = {node: node_replies(node, ttl) / all_replies for node in nodes}
+            logger.debug("link_dist at ttl %d: %s", ttl, link_dist)
         else:
             # if we did not observe links at the previous ttl
             # we won't apply weights to the n_k afterwards
-            link_dist = {node: 1.0 for node in nodes}
+            logger.debug("No links at ttl %d", ttl)
+            link_dist = {node: 1.0 / len(nodes) for node in nodes}
 
         return link_dist
 
@@ -113,6 +126,8 @@ class DiamondMiner:
 
         # for every discovered node at this TTL (non None)
         nodes_at_ttl = set(filter(bool, (x[1] for x in self.links_by_ttl[ttl])))
+        if nodes_at_ttl:
+            logger.debug("Nodes at TTL %d: %s", ttl, nodes_at_ttl)
 
         # fetch the distribution of the nodes at this TTL.
         # this is important to determine what percentage of probes
@@ -133,14 +148,31 @@ class DiamondMiner:
 
             # the minimum number of probes to send to confirm we got all successors
             # We try to dismiss the hypothesis that there are more successors than we observed
+            logger.debug("Detected %d successors for node %s", n_successors, node)
             n_k = stopping_point(n_successors, self.failure_probability)
 
             # number of outgoing probes that went through the node
-            n_probes = len([x for x in self.links_by_ttl[ttl] if x[1] == node])
+            n_probes = len([x for x in self.links_by_ttl[ttl] if x[1] == node and x[2]])
+            # other = len([x for x in self.links_by_ttl[ttl] if x[0] == node and x[1]])
+            logger.debug(
+                "Detected %d outgoing links (probes) for node %s at ttl %d",
+                n_probes,
+                node,
+                ttl,
+            )
+            # n_probes = other
+
+            logger.debug(
+                "Expected %d probes for node %s at ttl %d and already sent %d",
+                n_k,
+                node,
+                ttl,
+                n_probes,
+            )
 
             # if we have not sent enough probes for this node
             if n_probes < n_k:
-
+                logger.debug("|> Node %s is therefore unresolved", node)
                 # mark the node as unresolved
                 unresolved.append(node)
 
@@ -148,9 +180,25 @@ class DiamondMiner:
                 # it is the threshold n_k weighted by how difficult it is to reach
                 # this node, i.e. the distribution of probes that reach this node
                 weighted_thresholds.append(n_k / link_dist[node])
+                logger.debug(
+                    "|> At ttl %d, the distribution of nodes is %s", ttl, link_dist
+                )
+                logger.debug("|> Its distribution is %f", link_dist[node])
+                logger.debug(
+                    "|> Node %s is unresolved, with a weighted threshold of %d",
+                    node,
+                    n_k / link_dist[node],
+                )
 
         # we store the number of unresolved nodes at each TTL for logging purposes
         self.n_unresolved[ttl] = len(unresolved)
+        if unresolved:
+            logger.debug("Unresolved nodes at TTL %d: %s", ttl, unresolved)
+            logger.debug(
+                "|> Weighted thresholds at TTL %d: %s",
+                ttl,
+                ceil(max(weighted_thresholds, default=0)),
+            )
 
         return unresolved, ceil(max(weighted_thresholds, default=0))
 
@@ -158,6 +206,18 @@ class DiamondMiner:
         self.current_round += 1
 
         self.replies_by_round[self.current_round] = replies
+        logger.debug("######### Round %d: %d replies", self.current_round, len(replies))
+        replies_by_ttl = defaultdict(list)
+        for reply in replies:
+            replies_by_ttl[reply.probe_ttl].append(reply)
+        for ttl, ttl_replies in sorted(replies_by_ttl.items(), key=lambda x: x[0]):
+            # log replies at each TTL
+            # log content of replies at each TTL
+            logger.debug(
+                "Replies @ TTL %d from: %s",
+                ttl,
+                Counter(x.reply_src_addr for x in ttl_replies),
+            )
 
         if self.current_round > self.max_round:
             return []
@@ -185,7 +245,9 @@ class DiamondMiner:
         # we take the max of both values.
 
         def combined_max_flow(ttl):
-            return max(max_flows_by_ttl[ttl], max_flows_by_ttl.get(ttl - 1, 0))
+            return min(
+                max(max_flows_by_ttl[ttl], max_flows_by_ttl.get(ttl - 1, 0)), 2**14
+            )
 
         flows_by_ttl = {
             ttl: range(self.probes_sent[ttl], combined_max_flow(ttl))
@@ -207,8 +269,31 @@ class DiamondMiner:
                     mapper_v6=self.mapper_v6,
                 )
             )
+            logger.debug(
+                "Round %d: Sending %d probes to TTL %d",
+                self.current_round,
+                len(probes_for_ttl),
+                ttl,
+            )
+
             self.probes_sent[ttl] += len(probes_for_ttl)
             probes.extend(probes_for_ttl)
 
-        shuffle(probes)
+        # shuffle(probes)
+        # from tests.fakenet.fakenet import graph_from_links
+
+        # log the current topology discovered so far
+        # links = {
+        #     ttl: list((x, y) for _, x, y in self.links_by_ttl[ttl] if x and y)
+        #     for ttl in range(1, self.max_ttl)
+        # }
+        # filter links to only show the ttl that have links
+        # links = {k: v for k, v in links.items() if v}
+        # if links:
+        #     graph = graph_from_links("4.4.4.4", links)
+        #     logger.debug(">>> Current topology:")
+        #     for start, end in graph.edges:
+        #         logger.debug(">   %s --> %s", start, end)
+        # else:
+        #     logger.debug("No links discovered so far")
         return probes

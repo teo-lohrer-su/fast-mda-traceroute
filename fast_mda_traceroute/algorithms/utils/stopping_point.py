@@ -23,3 +23,22 @@ def stopping_point(n_interfaces: int, failure_probability: float) -> int:
 
     return n_probes
 
+
+@cache
+def stopping_point_prob(n_interfaces: int, failure_probability: float) -> int:
+    # computes the minimal number of probes required to have reach_prob > a threshold
+    n_probes = 0
+
+    while reach_prob(n_interfaces + 1, n_probes) < (1 - failure_probability):
+        n_probes += 1
+
+    return n_probes, reach_prob(n_interfaces + 1, n_probes)
+
+
+if __name__ == "__main__":
+    # Example
+    failure_probability = 0.05
+    for n_interfaces in range(1, 21):
+        print(
+            f"{n_interfaces}: {stopping_point_prob(n_interfaces, failure_probability)}"
+        )
