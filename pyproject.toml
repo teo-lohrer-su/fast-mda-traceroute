@@ -19,6 +19,7 @@ tqdm = "^4.66.2"
 matplotlib = "^3.8.3"
 xxhash = "^3.4.1"
 pytest-xdist = "^3.5.0"
+networkx = "^3.2.1"
 
 [tool.poetry.dev-dependencies]
 bumpversion = "^0.6.0"
