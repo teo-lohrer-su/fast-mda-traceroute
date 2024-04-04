@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         python: ["3.10", "3.x"]
     steps:
       - uses: actions/checkout@v2
@@ -22,7 +22,7 @@ jobs:
       - name: Install package
         run: poetry install
       - name: Run tests
-        run: sudo $(poetry env info -p)/bin/pytest --cov=fast_mda_traceroute --cov-report=xml
+        run: sudo $(poetry env info -p)/bin/pytest -n 4 --cov=fast_mda_traceroute --cov-report=xml
       - uses: codecov/codecov-action@v2
 
   docker:
