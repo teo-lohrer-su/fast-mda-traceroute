@@ -74,7 +74,9 @@ def test_get_links_by_ttl(make_reply):
         make_reply(1, "::9", 24001, 33434, 1, "::1"),
         make_reply(1, "::9", 24001, 33434, 3, "::3"),
     ]
-    assert get_links_by_ttl([*replies_flow_1, *replies_flow_2]) == {
+    links_by_ttl = get_links_by_ttl([*replies_flow_1, *replies_flow_2])
+    links_by_ttl = {k: set(v) for k, v in links_by_ttl.items()}
+    assert links_by_ttl == {
         1: {(1, "::1", "::2"), (1, "::1", None)},
         2: {(2, "::2", "::3"), (2, None, "::3")},
     }

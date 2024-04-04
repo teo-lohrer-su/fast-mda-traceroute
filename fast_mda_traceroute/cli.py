@@ -6,7 +6,6 @@ from datetime import datetime
 from random import randint
 from typing import List, Optional
 from collections import Counter
-from sparklines import sparklines
 
 import pycaracal
 import typer
@@ -48,15 +47,15 @@ def version_callback(value: bool):
 
 def fancy_log(max_ttl, alg, probes):
     unresolved = [alg.n_unresolved[ttl] for ttl in range(max_ttl + 1)]
-    logger.info("unresolved=%s", "".join(sparklines(unresolved)))
+    logger.debug("unresolved=%s", unresolved)
     c = Counter(p.ttl for p in probes)
     sending = [c[ttl] for ttl in range(max_ttl + 1)]
-    logger.info("sending...=%s", "".join(sparklines(sending)))
+    logger.debug("sending...=%s", sending)
     shape = []
     for ttl in range(max_ttl + 1):
         size = len(set(alg.links_by_ttl[ttl]))
         shape.append(size)
-    logger.info("shape....=%s", "".join(sparklines(shape)))
+    logger.debug("shape....=%s", shape)
 
 
 @app.command()
