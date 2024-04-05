@@ -1,9 +1,11 @@
-import os
 import glob
+import os
+
 import networkx as nx
-from pycaracal import Probe, Reply
 import pytest
 from fakenet.fakenet import FakeNet, FakeProber, graph_from_links
+from pycaracal import Probe, Reply
+
 from fast_mda_traceroute.algorithms.diamond_miner import DiamondMiner
 from fast_mda_traceroute.typing import Protocol
 
@@ -69,13 +71,15 @@ def eval_diamond_miner(net: FakeNet, confidence: float = 95.0, seed: int = 0) ->
 @pytest.mark.parametrize("length", range(3, 6))
 def test_meshed_networks(height, length):
     OK = sum(
-        1
-        if eval_diamond_miner(
-            net=FakeNet.meshed([height for _ in range(length)]),
-            confidence=DEFAULT_CONFIDENCE,
-            seed=seed,
+        (
+            1
+            if eval_diamond_miner(
+                net=FakeNet.meshed([height for _ in range(length)]),
+                confidence=DEFAULT_CONFIDENCE,
+                seed=seed,
+            )
+            else 0
         )
-        else 0
         for seed in range(N_TRIES)
     )
     assert OK / N_TRIES > ACCEPTANCE_THRESHOLD
@@ -85,13 +89,15 @@ def test_meshed_networks(height, length):
 @pytest.mark.parametrize("length", range(3, 6))
 def test_multi_single_paths_networks(n_paths, length):
     OK = sum(
-        1
-        if eval_diamond_miner(
-            net=FakeNet.multi_single_paths(n_paths=n_paths, path_length=length),
-            confidence=DEFAULT_CONFIDENCE,
-            seed=seed,
+        (
+            1
+            if eval_diamond_miner(
+                net=FakeNet.multi_single_paths(n_paths=n_paths, path_length=length),
+                confidence=DEFAULT_CONFIDENCE,
+                seed=seed,
+            )
+            else 0
         )
-        else 0
         for seed in range(N_TRIES)
     )
     assert OK / N_TRIES > ACCEPTANCE_THRESHOLD
@@ -100,28 +106,52 @@ def test_multi_single_paths_networks(n_paths, length):
 @pytest.mark.parametrize("length", range(1, 20))
 def test_single_path_network(length):
     OK = sum(
-        1
-        if eval_diamond_miner(
-            net=FakeNet.multi_single_paths(n_paths=1, path_length=length),
-            confidence=DEFAULT_CONFIDENCE,
-            seed=seed,
+        (
+            1
+            if eval_diamond_miner(
+                net=FakeNet.multi_single_paths(n_paths=1, path_length=length),
+                confidence=DEFAULT_CONFIDENCE,
+                seed=seed,
+            )
+            else 0
         )
-        else 0
         for seed in range(N_TRIES)
     )
     assert OK / N_TRIES > ACCEPTANCE_THRESHOLD
 
 
+@pytest.mark.parametrize("confidence", [60.0, 70.0, 80.0, 90.0])
+def test_varying_confidence(confidence):
+    OK = sum(
+        (
+            1
+            if eval_diamond_miner(
+                net=FakeNet.multi_single_paths(n_paths=4, path_length=5),
+                confidence=confidence,
+                seed=seed,
+            )
+            else 0
+        )
+        for seed in range(N_TRIES)
+    )
+    lower_threshold = confidence * (ACCEPTANCE_THRESHOLD / DEFAULT_CONFIDENCE)
+    # for a confidence of 60
+    # lower = 60 * (75 / 95) = 47
+    assert lower_threshold < OK / N_TRIES
+
+
 @pytest.mark.parametrize("confidence", [10.0, 30.0, 50.0])
 def test_low_confidence_fails(confidence):
     OK = sum(
-        1
-        if eval_diamond_miner(
-            net=FakeNet.meshed([4 for _ in range(4)]),
-            confidence=confidence,
-            seed=seed,
+        (
+            1
+            if eval_diamond_miner(
+                net=FakeNet.meshed([4 for _ in range(4)]),
+                confidence=confidence,
+                seed=seed,
+            )
+            else 0
         )
-        else 0
         for seed in range(N_TRIES)
     )
     assert OK / N_TRIES < ACCEPTANCE_THRESHOLD
@@ -132,13 +162,15 @@ def test_low_confidence_fails(confidence):
 @pytest.mark.parametrize("graph_seed", [0, 1, 2])
 def test_random_network(density, depth, graph_seed):
     OK = sum(
-        1
-        if eval_diamond_miner(
-            net=FakeNet.random_graph(p_edge=density, depth=depth, seed=graph_seed),
-            confidence=DEFAULT_CONFIDENCE,
-            seed=seed,
+        (
+            1
+            if eval_diamond_miner(
+                net=FakeNet.random_graph(p_edge=density, depth=depth, seed=graph_seed),
+                confidence=DEFAULT_CONFIDENCE,
+                seed=seed,
+            )
+            else 0
         )
-        else 0
         for seed in range(N_TRIES)
     )
     assert OK / N_TRIES > ACCEPTANCE_THRESHOLD
@@ -148,15 +180,19 @@ def test_random_network(density, depth, graph_seed):
 def test_on_data_files(filepath):
     net = FakeNet.from_file(filepath)
     if len(net.nodes()) > 50 or len(net.edges()) > 80:
-        assert False, f"Skipping {filepath}, got {len(net.nodes())} nodes and {len(net.edges())} edges"
+        assert (
+            False
+        ), f"Skipping {filepath}, got {len(net.nodes())} nodes and {len(net.edges())} edges"
     OK = sum(
-        1
-        if eval_diamond_miner(
-            net=net,
-            confidence=DEFAULT_CONFIDENCE,
-            seed=seed,
+        (
+            1
+            if eval_diamond_miner(
+                net=net,
+                confidence=DEFAULT_CONFIDENCE,
+                seed=seed,
+            )
+            else 0
         )
-        else 0
         for seed in range(N_TRIES)
     )
     assert OK / N_TRIES > ACCEPTANCE_THRESHOLD
