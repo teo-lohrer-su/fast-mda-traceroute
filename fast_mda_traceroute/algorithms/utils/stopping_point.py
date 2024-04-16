@@ -2,26 +2,40 @@ from functools import cache
 from math import comb
 
 
-def compute_p(k_max, n_max, N_max):
-    res = [[[0 for _ in range(N_max)] for _ in range(n_max)] for _ in range(k_max)]
-    res[1][1] = [1 for _ in range(N_max)]
-    res[0][0] = [1 for _ in range(N_max)]
-    for k in range(2, k_max):
-        for n in range(1, n_max):
-            for N in range(1, N_max):
-                p_found_all = res[k - 1][n][N]
-                p_not_find_new = n / N
-                p_found_all_but_one = res[k - 1][n - 1][N]
-                p_find_new = (N - n + 1) / N
-                res[k][n][N] = (
-                    p_found_all * p_not_find_new + p_found_all_but_one * p_find_new
-                )
-    return res
+class PreComputedP:
+    mat: list[list[list[float]]]
+    n_max: int
+
+    def __init__(self, k_max: int, n_max: int):
+        self.n_max = n_max
+
+        self.mat = [
+            [[0 for _ in range(n_max)] for _ in range(n_max)] for _ in range(k_max)
+        ]
+        self.mat[1][1] = [1 for _ in range(n_max)]
+        self.mat[0][0] = [1 for _ in range(n_max)]
+        self.complete(k_max)
+
+    def complete(self, k_max):
+        for k in range(len(self.mat), k_max):
+            for n in range(1, self.n_max):
+                for N in range(1, self.n_max):
+                    p_found_all = self.mat[k - 1][n][N]
+                    p_not_find_new = n / N
+                    p_found_all_but_one = self.mat[k - 1][n - 1][N]
+                    p_find_new = (N - n + 1) / N
+                    self.mat[k][n][N] = (
+                        p_found_all * p_not_find_new + p_found_all_but_one * p_find_new
+                    )
+
+    def __getitem__(self, key):
+        if key >= len(self.mat):
+            self.complete(key)
+        return self.mat[key]
 
 
-K_MAX = 1000
 N_MAX = 150
-P = compute_p(K_MAX, N_MAX, N_MAX)
+P = PreComputedP(10, N_MAX)
 
 
 @cache
