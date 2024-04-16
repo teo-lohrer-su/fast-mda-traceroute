@@ -3,62 +3,92 @@ from math import comb
 import json
 import os
 
+# manual cache
+P = dict()
 
-class PreComputedP:
-    mat: list[list[list[float]]]
-    n_max: int
 
-    def __init__(self, k_max: int, n_max: int):
-        self.mat = [
-            [[0 for _ in range(n_max)] for _ in range(n_max)] for _ in range(k_max)
-        ]
-        self.mat[1][1] = [1 for _ in range(n_max)]
-        self.mat[0][0] = [1 for _ in range(n_max)]
-        self.complete(k_max)
+# @cache
+def p_k_n(k, n, N):
+    if k in P and n in P[k] and N in P[k][n]:
+        return P[k][n][N]
+    mat = [[[0 for _ in range(N + 1)] for _ in range(n + 1)] for _ in range(k + 1)]
+    mat[1][1] = [1 for _ in range(N + 1)]
+    mat[0][0] = [1 for _ in range(N + 1)]
+    for x in range(2, k + 1):
+        for y in range(1, n + 1):
+            for z in range(1, N + 1):
+                p_found_all = mat[x - 1][y][z]
+                p_not_find_new = y / z
+                p_found_all_but_one = mat[x - 1][y - 1][z]
+                p_find_new = (z - y + 1) / z
+                mat[x][y][z] = (
+                    p_found_all * p_not_find_new + p_found_all_but_one * p_find_new
+                )
+                # cache the value in the global dict P
+                if x not in P:
+                    P[x] = dict()
+                if y not in P[x]:
+                    P[x][y] = dict()
+                P[x][y][z] = mat[x][y][z]
+    return mat[k][n][N]
 
-    @property
-    def n_max(self):
-        return len(self.mat[0][0])
 
-    @property
-    def k_max(self):
-        return len(self.mat)
+# class PreComputedP:
+#     mat: dict[int, dict[int, dict[int, float]]]
+#     n_max: int
 
-    def complete(self, k_max):
-        for k in range(len(self.mat), k_max):
-            for n in range(1, self.n_max):
-                for N in range(1, self.n_max):
-                    p_found_all = self.mat[k - 1][n][N]
-                    p_not_find_new = n / N
-                    p_found_all_but_one = self.mat[k - 1][n - 1][N]
-                    p_find_new = (N - n + 1) / N
-                    self.mat[k][n][N] = (
-                        p_found_all * p_not_find_new + p_found_all_but_one * p_find_new
-                    )
+#     def __init__(self, k_max: int, n_max: int):
+#         self.mat = [
+#             [[0 for _ in range(n_max)] for _ in range(n_max)] for _ in range(k_max)
+#         ]
+#         self.mat[1][1] = [1 for _ in range(n_max)]
+#         self.mat[0][0] = [1 for _ in range(n_max)]
+#         self.complete(k_max)
 
-    @cache
-    def __getitem__(self, key):
-        if key >= len(self.mat):
-            self.complete(key)
-        return self.mat[key]
+#     @property
+#     def n_max(self):
+#         return len(self.mat[0][0])
+
+#     @property
+#     def k_max(self):
+#         return len(self.mat)
+
+#     def complete(self, k_max):
+#         for k in range(len(self.mat), k_max):
+#             for n in range(1, self.n_max):
+#                 for N in range(1, self.n_max):
+#                     p_found_all = self.mat[k - 1][n][N]
+#                     p_not_find_new = n / N
+#                     p_found_all_but_one = self.mat[k - 1][n - 1][N]
+#                     p_find_new = (N - n + 1) / N
+#                     self.mat[k][n][N] = (
+#                         p_found_all * p_not_find_new + p_found_all_but_one * p_find_new
+#                     )
+
+#     @cache
+#     def __getitem__(self, key):
+#         if key >= len(self.mat):
+#             self.complete(key)
+#         return self.mat[key]
 
 
 N_MAX = 256
 
-P_FILENAME = "p_k1000_n150.json"
+# P_FILENAME = "p_k1000_n150.json"
 
-if os.path.exists(P_FILENAME):
-    with open(P_FILENAME, "r") as f:
-        P = json.load(f)
-else:
-    P = PreComputedP(200, N_MAX)
+# if os.path.exists(P_FILENAME):
+#     with open(P_FILENAME, "r") as f:
+#         P = json.load(f)
+# else:
+#     P = PreComputedP(200, N_MAX)
 
 
 @cache
 def optimal_N(k, n, likelihood_threshold=0.2):
     if k == n:
         for N in range(n, N_MAX):
-            prob = P[k][n][N]
+            # prob = P[k][n][N]
+            prob = p_k_n(k, n, N)
             if prob > likelihood_threshold:
                 return N
     if k < n:
@@ -66,7 +96,8 @@ def optimal_N(k, n, likelihood_threshold=0.2):
     N = n - 1
     prev_prob = 0
     for N in range(n - 1, N_MAX):
-        prob = P[k][n][N]
+        # prob = P[k][n][N]
+        prob = p_k_n(k, n, N)
         if prob < prev_prob:
             return N - 1
         prev_prob = prob
