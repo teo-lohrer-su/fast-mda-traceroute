@@ -1,6 +1,5 @@
 from collections import defaultdict
 from math import ceil
-from random import shuffle
 from typing import Dict, List, Set
 
 from collections import Counter
@@ -12,7 +11,10 @@ from more_itertools import flatten
 from pycaracal import Reply
 
 from fast_mda_traceroute.logger import logger
-from fast_mda_traceroute.algorithms.utils.stopping_point import stopping_point
+from fast_mda_traceroute.algorithms.utils.stopping_point import (
+    optimal_N,
+    stopping_point,
+)
 from fast_mda_traceroute.links import get_links_by_ttl
 from fast_mda_traceroute.typing import Link
 from fast_mda_traceroute.utils import is_ipv4
@@ -113,7 +115,9 @@ class DiamondMiner:
 
         return link_dist
 
-    def unresolved_nodes_at_ttl(self, ttl: int) -> List[str]:
+    def unresolved_nodes_at_ttl(
+        self, ttl: int, optimal_jump: bool = False
+    ) -> tuple[list[str], int]:
         # returns the list of unresolved nodes at a given TTL
         # a node is said to be unresolved if not enough probes
         # have observed the outgoing links of this node.
@@ -179,7 +183,12 @@ class DiamondMiner:
                 # we store the total number of probes to send to get confirmation:
                 # it is the threshold n_k weighted by how difficult it is to reach
                 # this node, i.e. the distribution of probes that reach this node
-                weighted_thresholds.append(n_k / link_dist[node])
+                if optimal_jump:
+                    opti_N = optimal_N(n_probes, n_successors)
+                    opti_n_k = stopping_point(opti_N + 1, self.failure_probability)
+                    weighted_thresholds.append(opti_n_k / link_dist[node])
+                else:
+                    weighted_thresholds.append(n_k / link_dist[node])
                 logger.debug(
                     "|> At ttl %d, the distribution of nodes is %s", ttl, link_dist
                 )
@@ -202,7 +211,9 @@ class DiamondMiner:
 
         return unresolved, ceil(max(weighted_thresholds, default=0))
 
-    def next_round(self, replies: List[Reply]) -> List[Probe]:
+    def next_round(
+        self, replies: List[Reply], optimal_jump: bool = False
+    ) -> List[Probe]:
         self.current_round += 1
 
         self.replies_by_round[self.current_round] = replies
@@ -235,7 +246,7 @@ class DiamondMiner:
             }
         else:
             max_flows_by_ttl = {
-                ttl: self.unresolved_nodes_at_ttl(ttl)[1]
+                ttl: self.unresolved_nodes_at_ttl(ttl, optimal_jump)[1]
                 for ttl in range(self.min_ttl, self.max_ttl + 1)
             }
 

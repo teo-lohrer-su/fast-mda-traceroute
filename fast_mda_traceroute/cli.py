@@ -146,6 +146,10 @@ def main(
         metavar="BYTES",
         help="Receiver buffer size in bytes.",
     ),
+    optimal_jump: bool = typer.Option(
+        False,
+        help="Whether to use the jump-ahead optimization to minimize the number of rounds.",
+    ),
     integrity_check: bool = typer.Option(
         True,
         help="Whether to verify that replies match valid probes or not.",
@@ -231,7 +235,7 @@ def main(
     start_time = datetime.now()
     last_replies: List[Reply] = []
     while True:
-        probes = [Probe(*x) for x in alg.next_round(last_replies)]
+        probes = [Probe(*x) for x in alg.next_round(last_replies, optimal_jump)]
         total_ips = set(r.reply_src_addr for r in alg.replies)
         logger.info(
             "round=%d links_found=%d total_ip=%d probes=%d expected_time=%.1fs",
