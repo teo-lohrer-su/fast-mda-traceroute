@@ -7,14 +7,22 @@ class PreComputedP:
     n_max: int
 
     def __init__(self, k_max: int, n_max: int):
-        self.n_max = n_max
-
         self.mat = [
             [[0 for _ in range(n_max)] for _ in range(n_max)] for _ in range(k_max)
         ]
         self.mat[1][1] = [1 for _ in range(n_max)]
         self.mat[0][0] = [1 for _ in range(n_max)]
         self.complete(k_max)
+
+    @cache
+    @property
+    def n_max(self):
+        return len(self.mat[0][0])
+
+    @cache
+    @property
+    def k_max(self):
+        return len(self.mat)
 
     def complete(self, k_max):
         for k in range(len(self.mat), k_max):
@@ -28,14 +36,15 @@ class PreComputedP:
                         p_found_all * p_not_find_new + p_found_all_but_one * p_find_new
                     )
 
+    @cache
     def __getitem__(self, key):
         if key >= len(self.mat):
             self.complete(key)
         return self.mat[key]
 
 
-N_MAX = 150
-P = PreComputedP(10, N_MAX)
+N_MAX = 256
+P = PreComputedP(200, N_MAX)
 
 
 @cache
