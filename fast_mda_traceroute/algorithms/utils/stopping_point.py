@@ -11,7 +11,7 @@ P = dict()
 def p_k_n(k, n, N):
     if k in P and n in P[k] and N in P[k][n]:
         return P[k][n][N]
-    mat = [[[0 for _ in range(N + 1)] for _ in range(n + 1)] for _ in range(k + 1)]
+    mat = [[[0 for _ in range(N + 2)] for _ in range(n + 2)] for _ in range(k + 2)]
     mat[1][1] = [1 for _ in range(N + 1)]
     mat[0][0] = [1 for _ in range(N + 1)]
     for x in range(2, k + 1):
