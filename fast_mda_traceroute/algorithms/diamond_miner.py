@@ -186,7 +186,8 @@ class DiamondMiner:
                 if optimal_jump:
                     opti_N = optimal_N(n_probes, n_successors)
                     opti_n_k = stopping_point(opti_N + 1, self.failure_probability)
-                    weighted_thresholds.append(opti_n_k / link_dist[node])
+                    # weighted_thresholds.append(opti_n_k / link_dist[node])
+                    weighted_thresholds.append(opti_n_k)
                 else:
                     weighted_thresholds.append(n_k / link_dist[node])
                 logger.debug(
