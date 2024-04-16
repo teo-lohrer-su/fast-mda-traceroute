@@ -45,7 +45,8 @@ class PreComputedP:
 
 N_MAX = 256
 
-P_FILENAME = "p_k2000_n256.json"
+P_FILENAME = "p_k1000_n150.json"
+
 if os.path.exists(P_FILENAME):
     with open(P_FILENAME, "r") as f:
         P = json.load(f)
