@@ -14,12 +14,10 @@ class PreComputedP:
         self.mat[0][0] = [1 for _ in range(n_max)]
         self.complete(k_max)
 
-    @cache
     @property
     def n_max(self):
         return len(self.mat[0][0])
 
-    @cache
     @property
     def k_max(self):
         return len(self.mat)
