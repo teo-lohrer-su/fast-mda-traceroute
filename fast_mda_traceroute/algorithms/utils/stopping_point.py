@@ -1,5 +1,7 @@
 from functools import cache
 from math import comb
+import json
+import os
 
 
 class PreComputedP:
@@ -42,7 +44,13 @@ class PreComputedP:
 
 
 N_MAX = 256
-P = PreComputedP(200, N_MAX)
+
+P_FILENAME = "p_k2000_n256.json"
+if os.path.exists(P_FILENAME):
+    with open(P_FILENAME, "r") as f:
+        P = json.load(f)
+else:
+    P = PreComputedP(200, N_MAX)
 
 
 @cache
