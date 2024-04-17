@@ -41,6 +41,7 @@ class OutputFormat(Enum):
     ScamperJSON = "scamper-json"
     Table = "table"
     Traceroute = "traceroute"
+    Quiet = "quiet"
 
 
 class Protocol(Enum):

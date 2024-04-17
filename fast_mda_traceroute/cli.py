@@ -279,6 +279,6 @@ def main(
     elif format == OutputFormat.Table:
         # TODO: set relevant replies here
         print(format_table(alg.time_exceeded_replies))
-    else:
+    elif format == OutputFormat.Traceroute:
         # TODO: set relevant replies here
         print(format_traceroute(alg.time_exceeded_replies))
