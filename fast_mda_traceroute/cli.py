@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import socket
 import sys
 from datetime import datetime
@@ -245,7 +246,8 @@ def main(
             len(probes),
             len(probes) / probing_rate,
         )
-        fancy_log(max_ttl, alg, probes)
+        if logger.level == logging.DEBUG:
+            fancy_log(max_ttl, alg, probes)
         if not probes:
             break
         last_replies = prober.probe(probes, wait)

@@ -18,7 +18,9 @@ SAMPLE_FILES = [
 ]
 
 
-def eval_diamond_miner(net: FakeNet, confidence: float = 95.0, seed: int = 0) -> bool:
+def eval_diamond_miner(
+    net: FakeNet, confidence: float = 95.0, seed: int = 0, optimal_jump=False
+) -> bool:
     prober = FakeProber(net, seed=seed)
 
     protocol = Protocol.ICMP
@@ -48,7 +50,9 @@ def eval_diamond_miner(net: FakeNet, confidence: float = 95.0, seed: int = 0) ->
     rnd = 0
     while True:
         rnd += 1
-        probes = [Probe(*x) for x in alg.next_round(last_replies)]
+        probes = [
+            Probe(*x) for x in alg.next_round(last_replies, optimal_jump=optimal_jump)
+        ]
         if not probes:
             break
         last_replies = prober.probe(probes)
@@ -69,7 +73,8 @@ def eval_diamond_miner(net: FakeNet, confidence: float = 95.0, seed: int = 0) ->
 
 @pytest.mark.parametrize("height", range(2, 5))
 @pytest.mark.parametrize("length", range(3, 6))
-def test_meshed_networks(height, length):
+@pytest.mark.parametrize("optimal_jump", [False, True])
+def test_meshed_networks(height, length, optimal_jump):
     OK = sum(
         (
             1
@@ -77,6 +82,7 @@ def test_meshed_networks(height, length):
                 net=FakeNet.meshed([height for _ in range(length)]),
                 confidence=DEFAULT_CONFIDENCE,
                 seed=seed,
+                optimal_jump=optimal_jump,
             )
             else 0
         )
@@ -87,7 +93,8 @@ def test_meshed_networks(height, length):
 
 @pytest.mark.parametrize("n_paths", range(3, 6))
 @pytest.mark.parametrize("length", range(3, 6))
-def test_multi_single_paths_networks(n_paths, length):
+@pytest.mark.parametrize("optimal_jump", [False, True])
+def test_multi_single_paths_networks(n_paths, length, optimal_jump):
     OK = sum(
         (
             1
@@ -95,6 +102,7 @@ def test_multi_single_paths_networks(n_paths, length):
                 net=FakeNet.multi_single_paths(n_paths=n_paths, path_length=length),
                 confidence=DEFAULT_CONFIDENCE,
                 seed=seed,
+                optimal_jump=optimal_jump,
             )
             else 0
         )
@@ -104,7 +112,8 @@ def test_multi_single_paths_networks(n_paths, length):
 
 
 @pytest.mark.parametrize("length", range(1, 20))
-def test_single_path_network(length):
+@pytest.mark.parametrize("optimal_jump", [False, True])
+def test_single_path_network(length, optimal_jump):
     OK = sum(
         (
             1
@@ -112,6 +121,7 @@ def test_single_path_network(length):
                 net=FakeNet.multi_single_paths(n_paths=1, path_length=length),
                 confidence=DEFAULT_CONFIDENCE,
                 seed=seed,
+                optimal_jump=optimal_jump,
             )
             else 0
         )
@@ -160,7 +170,8 @@ def test_low_confidence_fails(confidence):
 @pytest.mark.parametrize("density", [0.5, 0.7, 0.9])
 @pytest.mark.parametrize("depth", range(2, 6))
 @pytest.mark.parametrize("graph_seed", [0, 1, 2])
-def test_random_network(density, depth, graph_seed):
+@pytest.mark.parametrize("optimal_jump", [False, True])
+def test_random_network(density, depth, graph_seed, optimal_jump):
     OK = sum(
         (
             1
@@ -168,6 +179,7 @@ def test_random_network(density, depth, graph_seed):
                 net=FakeNet.random_graph(p_edge=density, depth=depth, seed=graph_seed),
                 confidence=DEFAULT_CONFIDENCE,
                 seed=seed,
+                optimal_jump=optimal_jump,
             )
             else 0
         )
@@ -177,12 +189,11 @@ def test_random_network(density, depth, graph_seed):
 
 
 @pytest.mark.parametrize("filepath", SAMPLE_FILES)
-def test_on_data_files(filepath):
+@pytest.mark.parametrize("optimal_jump", [False, True])
+def test_on_data_files(filepath, optimal_jump):
     net = FakeNet.from_file(filepath)
     if len(net.nodes()) > 50 or len(net.edges()) > 80:
-        assert (
-            False
-        ), f"Skipping {filepath}, got {len(net.nodes())} nodes and {len(net.edges())} edges"
+        assert False, f"Skipping {filepath}, got {len(net.nodes())} nodes and {len(net.edges())} edges"
     OK = sum(
         (
             1
@@ -190,6 +201,7 @@ def test_on_data_files(filepath):
                 net=net,
                 confidence=DEFAULT_CONFIDENCE,
                 seed=seed,
+                optimal_jump=optimal_jump,
             )
             else 0
         )
