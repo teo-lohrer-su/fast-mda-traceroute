@@ -236,7 +236,10 @@ def main(
     start_time = datetime.now()
     last_replies: List[Reply] = []
     while True:
+        prep_start = datetime.now()
         probes = [Probe(*x) for x in alg.next_round(last_replies, optimal_jump)]
+        prep_end = datetime.now()
+        logger.info("prep_time=%s", (prep_end - prep_start))
         total_ips = set(r.reply_src_addr for r in alg.replies)
         logger.info(
             "round=%d links_found=%d total_ip=%d probes=%d expected_time=%.1fs",
