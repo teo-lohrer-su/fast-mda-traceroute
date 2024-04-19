@@ -185,8 +185,8 @@ class DiamondMiner:
                 # this node, i.e. the distribution of probes that reach this node
                 if optimal_jump:
                     opti_N = optimal_N(n_probes, n_successors)
-                    opti_n_k = stopping_point(opti_N + 1, self.failure_probability)
-                    weighted_thresholds.append(opti_n_k / link_dist[node])
+                    opti_n_k = stopping_point(opti_N, self.failure_probability)
+                    weighted_thresholds.append(max(n_k, opti_n_k) / link_dist[node])
                 else:
                     weighted_thresholds.append(n_k / link_dist[node])
                 logger.debug(
