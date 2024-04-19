@@ -1,4 +1,5 @@
 from collections import defaultdict
+from functools import cache
 from typing import Dict, List, Optional, Set
 
 from more_itertools import map_reduce
@@ -7,6 +8,7 @@ from pycaracal import Reply
 from fast_mda_traceroute.typing import Flow, Link, Pair
 
 
+@cache
 def get_replies_by_flow(replies: List[Reply]) -> Dict[Flow, List[Reply]]:
     return map_reduce(
         replies,
@@ -19,15 +21,17 @@ def get_replies_by_flow(replies: List[Reply]) -> Dict[Flow, List[Reply]]:
     )
 
 
+@cache
 def get_replies_by_ttl(replies: List[Reply]) -> Dict[int, List[Reply]]:
     return map_reduce(replies, lambda x: x.probe_ttl)  # type: ignore
 
 
+@cache
 def get_pairs_by_flow(replies: List[Reply]) -> Dict[Flow, List[Pair]]:
     pairs_by_flow = defaultdict(list)
     replies_by_flow = get_replies_by_flow(replies)
     for flow, replies in replies_by_flow.items():
-        replies_by_ttl = get_replies_by_ttl(replies)
+        replies_by_ttl = get_replies_by_ttl(tuple(replies))
         for near_ttl in range(min(replies_by_ttl), max(replies_by_ttl)):
             near_replies = replies_by_ttl.get(near_ttl, [None])
             far_replies = replies_by_ttl.get(near_ttl + 1, [None])
@@ -56,10 +60,11 @@ def get_links_by_flow_by_ttl(replies: List[Reply]) -> Dict[int, Dict[Flow, Set[L
     return links_by_ttl
 
 
+@cache
 def get_links_by_ttl(replies: List[Reply]) -> Dict[int, Set[Link]]:
     # links_by_ttl = defaultdict(set)
     links_by_ttl = defaultdict(list)
-    pairs_by_flow = get_pairs_by_flow(replies)
+    pairs_by_flow = get_pairs_by_flow(tuple(replies))
     for flow, pairs in pairs_by_flow.items():
         for near_ttl, near_reply, far_reply in pairs:
             # links_by_ttl[near_ttl].add(
@@ -80,9 +85,9 @@ def get_scamper_links(
     links: Dict[str, Dict[int, Dict[Optional[str], List[Reply]]]] = defaultdict(
         lambda: defaultdict(lambda: defaultdict(list))
     )
-    replies_by_flow = get_replies_by_flow(replies)
+    replies_by_flow = get_replies_by_flow(tuple(replies))
     for flow, flow_replies in replies_by_flow.items():
-        replies_by_ttl = get_replies_by_ttl(flow_replies)
+        replies_by_ttl = get_replies_by_ttl(tuple(flow_replies))
         for near_ttl in range(min(replies_by_ttl), max(replies_by_ttl)):
             # TODO: Handle per-packet load-balancing.
             far_ttl = near_ttl + 1

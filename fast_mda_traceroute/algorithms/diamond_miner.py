@@ -56,7 +56,7 @@ class DiamondMiner:
 
     @property
     def links_by_ttl(self) -> Dict[int, Set[Link]]:
-        return get_links_by_ttl(self.time_exceeded_replies)
+        return get_links_by_ttl(tuple(self.time_exceeded_replies))
 
     @property
     def links(self) -> Set[Link]:
@@ -64,11 +64,11 @@ class DiamondMiner:
 
     @property
     def replies(self) -> List[Reply]:
-        return list(flatten(self.replies_by_round.values()))
+        return tuple(flatten(self.replies_by_round.values()))
 
     @property
     def time_exceeded_replies(self) -> List[Reply]:
-        return [x for x in self.replies if x.time_exceeded]
+        return (x for x in self.replies if x.time_exceeded)
 
     @property
     def destination_unreachable_replies(self) -> List[Reply]:

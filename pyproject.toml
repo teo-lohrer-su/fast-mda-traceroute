@@ -33,6 +33,9 @@ types-tabulate = "^0.8.5"
 [tool.poetry.scripts]
 fast-mda-traceroute = 'fast_mda_traceroute.cli:app'
 
+[tool.poetry.group.dev.dependencies]
+pytest-profiling = "^1.7.0"
+
 [tool.mypy]
 ignore_missing_imports = true
 implicit_reexport = false

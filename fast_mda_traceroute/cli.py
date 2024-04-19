@@ -256,7 +256,7 @@ def main(
         last_replies = prober.probe(probes, wait)
     stop_time = datetime.now()
 
-    relevant_replies = alg.time_exceeded_replies + [
+    relevant_replies = list(alg.time_exceeded_replies) + [
         r for r in alg.echo_replies if r.reply_src_addr == destination
     ]
 
