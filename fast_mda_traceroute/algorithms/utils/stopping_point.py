@@ -1,7 +1,6 @@
-from datetime import datetime
 from functools import cache
-
 import math
+
 from scipy.special import comb, stirling2
 
 N_MAX = 120
@@ -17,39 +16,12 @@ def p_k_n(k, n, N):
     # We have n! to match the n interfaces with the n sets
     # There is a total N^k ways to distribute the k probes among the N interfaces
 
-    # stirling = sum(
-    #     (-1) ** (n - i) * int(comb(n, i, exact=False)) * i**k for i in range(n + 1)
-    # )
-
     stirling = stirling2(k, n, exact=False)
 
     if binom := comb(N, n, exact=False) == float("inf"):
         return 1.0
 
-    return int(stirling * binom) / N**k
-
-    # t0 = datetime.now()
-
-    # if stirling := stirling2(k, n, exact=False) == float("inf"):
-    #     return 1.0
-
-    # denominator = N**k
-
-    # stirling = int(stirling) / denominator
-
-    # time = datetime.now() - t0
-    # if time.total_seconds() > 1:
-    #     print(f"{k=}, {n=}, {N=}: stirling took {time.total_seconds()}")
-
-    # if factorial := math.factorial(n) == float("inf"):
-    #     return 1.0
-
-    # numerator = binom * stirling * factorial
-
-    # if numerator == float("inf"):
-    #     return 1.0
-
-    # return int(numerator)  # / denominator
+    return int(stirling * binom) * math.factorial(n) / N**k
 
 
 @cache
