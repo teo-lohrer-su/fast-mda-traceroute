@@ -6,7 +6,6 @@ from scipy.special import comb, stirling2
 N_MAX = 120
 
 
-@cache
 def p_k_n(k, n, N):
     if n > N or k <= 0 or n <= 0 or n > k:
         return 0.0
@@ -18,13 +17,13 @@ def p_k_n(k, n, N):
 
     stirling = stirling2(k, n, exact=False)
 
-    if binom := comb(N, n, exact=False) == float("inf"):
+    binom = comb(N, n, exact=False)
+    if binom == float("inf"):
         return 1.0
 
     return int(stirling * binom) * math.factorial(n) / N**k
 
 
-@cache
 def optimal_N(k, n, likelihood_threshold=0.4):
     if k < n:
         raise ValueError("k must be greater or equal to n")
@@ -46,6 +45,7 @@ def optimal_N(k, n, likelihood_threshold=0.4):
             return N - 1
         prev_prob = prob
     else:
+        print("defaulting to n")
         return n
 
 
@@ -125,13 +125,14 @@ if __name__ == "__main__":
     #         print(f" reach_prob : {reach_prob(N, k):.5f}")
 
     for N in range(1, 20):
-        print(f"{stopping_point(N, 0.05)}")
+        print(f"{stopping_point(N, 0.01)}")
     #     print(f"{new_stopping_point(N, 0.05)}")
     #     print("---------")
 
-    # for n in range(1, N + 1):
-    #     for k in range(n, 10):
-    #         print(f"{k=} {n=} -> {optimal_N(k, n)=}")
+    for k in range(1, 20):
+        print()
+        for n in range(1, k + 1):
+            print(f"{k=} {n=} -> {optimal_N(k, n, likelihood_threshold=0.99999)=}")
 
     # failure_probability = 0.05
     # for n_interfaces in range(1, 21):
