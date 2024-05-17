@@ -281,7 +281,7 @@ def main(
             print(json.dumps(obj))
     elif format == OutputFormat.Table:
         # TODO: set relevant replies here
-        print(format_table(alg.time_exceeded_replies))
+        print(format_table(relevant_replies))
     elif format == OutputFormat.Traceroute:
         # TODO: set relevant replies here
-        print(format_traceroute(alg.time_exceeded_replies))
+        print(format_traceroute(relevant_replies))

@@ -1,8 +1,9 @@
 import pytest
 from fakenet.fakenet import FakeNet
+from tests.fakenet.apriori import apriori_prob
 from tests.fakenet.config import (
-    ACCEPTANCE_THRESHOLD,
     DEFAULT_CONFIDENCE,
+    DELTA_THRESHOLD,
     N_TRIES,
     SAMPLE_FILES,
 )
@@ -13,7 +14,8 @@ from tests.fakenet.utils import eval_diamond_miner
 @pytest.mark.parametrize("optimal_jump", [False, True])
 def test_real_networks(filepath, optimal_jump):
     net = FakeNet.from_file(filepath)
-    if len(net.nodes()) > 50 or len(net.edges()) > 80:
+    expected = DELTA_THRESHOLD * apriori_prob(net, confidence=DEFAULT_CONFIDENCE / 100)
+    if len(net.nodes()) > 80 or len(net.edges()) > 100:
         assert False, f"Skipping {filepath}, got {len(net.nodes())} nodes and {len(net.edges())} edges"
     OK = sum(
         (
@@ -28,4 +30,4 @@ def test_real_networks(filepath, optimal_jump):
         )
         for seed in range(N_TRIES)
     )
-    assert OK / N_TRIES > ACCEPTANCE_THRESHOLD
+    assert OK / N_TRIES > expected

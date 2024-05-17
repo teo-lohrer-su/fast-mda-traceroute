@@ -2,7 +2,7 @@ import networkx as nx
 from pycaracal import Probe, Reply
 from fast_mda_traceroute.algorithms.diamond_miner import DiamondMiner
 from fast_mda_traceroute.typing import Protocol
-from tests.fakenet.fakenet import FakeNet, FakeProber
+from fakenet.fakenet import FakeNet, FakeProber
 
 
 def eval_diamond_miner(
@@ -55,7 +55,8 @@ def eval_diamond_miner(
     nx_graph = graph_from_links(src_addr, links)
 
     # check if nx_graph is equal to net
-    return nx.is_isomorphic(nx_graph, net)
+    res = nx.is_isomorphic(nx_graph, net)
+    return res
 
 
 def graph_from_links(

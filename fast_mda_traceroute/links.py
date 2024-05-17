@@ -26,13 +26,43 @@ def get_replies_by_ttl(replies: List[Reply]) -> Dict[int, List[Reply]]:
     return map_reduce(replies, lambda x: x.probe_ttl)  # type: ignore
 
 
+def get_successors(replies: List[Reply], src: str) -> Set[str]:
+    successors = set()
+    # fetch the addresses that are one hop away from the source and that have been reached
+    # with a flow id that also reached the source
+    ttls = [x.probe_ttl for x in replies if x.reply_src_addr == src]
+    for flow, replies in get_replies_by_flow(replies).items():
+        if any(x.reply_src_addr == src for x in replies):
+            for reply in replies:
+                if reply.probe_ttl - 1 in ttls:
+                    successors.add(reply.reply_src_addr)
+
+    return successors
+
+
+def get_flow_ids(replies: List[Reply], src: str) -> Set[Flow]:
+    flow_ids = set()
+    for flow, replies in get_replies_by_flow(replies).items():
+        if any(x.reply_src_addr == src for x in replies):
+            flow_ids.add(flow)
+    return flow_ids
+
+
+def get_min_flow_offset(replies: List[Reply], src: str) -> int:
+    min_flow = min(get_flow_ids(replies, src))
+    # generate dummy probes until we match the min_flow
+    flow = None
+    offset = 0
+
+
 @cache
 def get_pairs_by_flow(replies: List[Reply]) -> Dict[Flow, List[Pair]]:
     pairs_by_flow = defaultdict(list)
     replies_by_flow = get_replies_by_flow(replies)
+
     for flow, replies in replies_by_flow.items():
         replies_by_ttl = get_replies_by_ttl(tuple(replies))
-        for near_ttl in range(min(replies_by_ttl), max(replies_by_ttl)):
+        for near_ttl in range(min(replies_by_ttl) - 1, max(replies_by_ttl)):
             near_replies = replies_by_ttl.get(near_ttl, [None])
             far_replies = replies_by_ttl.get(near_ttl + 1, [None])
             for near_reply in near_replies:
@@ -65,9 +95,9 @@ def get_links_by_ttl(replies: List[Reply]) -> Dict[int, Set[Link]]:
     # links_by_ttl = defaultdict(set)
     links_by_ttl = defaultdict(list)
     pairs_by_flow = get_pairs_by_flow(tuple(replies))
+
     for flow, pairs in pairs_by_flow.items():
         for near_ttl, near_reply, far_reply in pairs:
-            # links_by_ttl[near_ttl].add(
             links_by_ttl[near_ttl].append(
                 (
                     near_ttl,

@@ -3,67 +3,71 @@ import math
 
 from scipy.special import comb, stirling2
 
-N_MAX = 120
+MAX_INTERFACES = 1024
 
 
-def p_k_n(k, n, N):
-    if n > N or k <= 0 or n <= 0 or n > k:
+def event_prob(n_probes, observed_interfaces, total_interfaces):
+    # Computes the probability of observing exactly observed_interfaces interfaces
+    # after sending n_probes probes to total_interfaces interfaces
+    if (
+        observed_interfaces > total_interfaces
+        or n_probes <= 0
+        or observed_interfaces <= 0
+        or observed_interfaces > n_probes
+    ):
         return 0.0
 
-    # We choose n interfaces among N
-    # We then have to pick a distribution of the k probes in n non-empty sets
-    # We have n! to match the n interfaces with the n sets
-    # There is a total N^k ways to distribute the k probes among the N interfaces
+    # We choose k interfaces among K
+    # We then have to pick a distribution of the n probes in k non-empty sets
+    # We have k! to match the k interfaces with the k sets
+    # There is a total K^n ways to distribute the n probes among the K interfaces
 
-    stirling = stirling2(k, n, exact=False)
+    stirling = stirling2(n_probes, observed_interfaces, exact=False)
 
-    binom = comb(N, n, exact=False)
-    if binom == float("inf"):
+    binom = comb(total_interfaces, observed_interfaces, exact=False)
+    if binom == float("inf") or stirling == float("inf"):
         return 1.0
 
-    return int(stirling * binom) * math.factorial(n) / N**k
+    return (
+        int(stirling * binom)
+        * math.factorial(observed_interfaces)
+        / total_interfaces**n_probes
+    )
 
 
-def optimal_N(k, n, likelihood_threshold=0.4):
-    if k < n:
-        raise ValueError("k must be greater or equal to n")
+def estimate_total_interfaces(n_probes, observed_interfaces, likelihood_threshold=0.95):
+    # Gives the optimal estimation for the number of interfaces
+    # given the number of probes and the number of observed interfaces
+    if n_probes < observed_interfaces:
+        raise ValueError(
+            f"{n_probes=} must be greater or equal to {observed_interfaces=}"
+        )
 
-    if k == n:
-        for N in range(n, N_MAX):
-            prob = p_k_n(k, n, N)
+    if n_probes == observed_interfaces:
+        for total_interfaces in range(observed_interfaces, MAX_INTERFACES):
+            prob = event_prob(n_probes, observed_interfaces, total_interfaces)
             if prob > likelihood_threshold:
-                return N
+                return total_interfaces
         else:
-            return n
+            return observed_interfaces
 
     prev_prob = 0
-    for N in range(n - 1, N_MAX):
-        prob = p_k_n(k, n, N)
+    for total_interfaces in range(observed_interfaces - 1, MAX_INTERFACES):
+        prob = event_prob(n_probes, observed_interfaces, total_interfaces)
         if prob > likelihood_threshold:
-            return N
+            return total_interfaces
         if prob < prev_prob:
-            return N - 1
+            return total_interfaces - 1
         prev_prob = prob
     else:
-        print("defaulting to n")
-        return n
+        return observed_interfaces
 
 
 @cache
 def reach_prob(total_interfaces: int, n_probes: int) -> float:
     # Hypothesis: there are total_interfaces interfaces in total, and sent n_probes.
     # what is the probability to reach all interfaces?
-    try:
-        big_sum = sum(
-            comb(total_interfaces, i, exact=True)
-            * (i**n_probes)
-            * (-1) ** (total_interfaces - i - 1)
-            for i in range(total_interfaces)
-        )
-        res = 1 - big_sum / total_interfaces**n_probes
-        return res
-    except OverflowError:
-        return p_k_n(n_probes, total_interfaces, total_interfaces)
+    return event_prob(n_probes, total_interfaces, total_interfaces)
 
 
 @cache
@@ -89,53 +93,16 @@ def stopping_point(n_interfaces: int, failure_probability: float) -> int:
     return upper_bound
 
 
-# @cache
-# def new_stopping_point(n_interfaces: int, failure_probability: float) -> int:
-#     # computes the minimal number of probes required to have reach_prob > a threshold
-#     n_probes = 0
-
-#     while p_k_n(k=n_probes, n=n_interfaces + 1, N=n_interfaces + 1) < (
-#         1 - failure_probability
-#     ):
-#         n_probes += 1
-
-#     return n_probes
-
-
 if __name__ == "__main__":
-    # Example
-    # k, n, N = 2, 2, 3
-    # print(f"{k=}, {n=}, {N=}: {f(k, n, N):.2f}")
-    # print(f"{k=}, {n=}, {N=}: {g(k, n, N):.2f}")
-    # for N in range(2, 6):
-    #     print("---------")
-    #     for k in range(0, 10):
-    #         print()
-    #         for n in range(0, min(k, N) + 1):
-    #             print(f"{k=}, {n=}, {N=}")
-    #             print(f" p_k_n : {p_k_n(k, n, N):.5f}")
-    #             print(f" reach_prob : {reach_prob(N, n):.5f}")
-    # p_k_n(20000, 300, 301)
-    # for N in range(2, 6):
-    #     print("---------")
-    #     for k in range(0, 10):
-    #         print(f"{k=}, {N=}")
-    #         print(f" p_k_n : {p_k_n(k, N, N):.5f}")
-    #         print(f" p_k_n+1 : {p_k_n(k, N+1, N+1):.5f}")
-    #         print(f" reach_prob : {reach_prob(N, k):.5f}")
+    # Examples
 
-    for N in range(1, 20):
-        print(f"{stopping_point(N, 0.01)}")
-    #     print(f"{new_stopping_point(N, 0.05)}")
-    #     print("---------")
+    for total_interfaces in range(1, 20):
+        print(f"{stopping_point(total_interfaces, 0.05)}")
 
-    for k in range(1, 20):
-        print()
-        for n in range(1, k + 1):
-            print(f"{k=} {n=} -> {optimal_N(k, n, likelihood_threshold=0.99999)=}")
-
-    # failure_probability = 0.05
-    # for n_interfaces in range(1, 21):
-    #     print(
-    #         f"{n_interfaces}: {stopping_point_prob(n_interfaces, failure_probability)}"
-    #     )
+    for n_probes in range(1, 20):
+        print("---")
+        for observed_interfaces in range(1, n_probes + 1):
+            estimate = estimate_total_interfaces(
+                n_probes, observed_interfaces, likelihood_threshold=0.95
+            )
+            print(f"n={n_probes} k={observed_interfaces} -> {estimate}")

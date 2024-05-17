@@ -12,10 +12,13 @@ from pycaracal import Reply
 
 from fast_mda_traceroute.logger import logger
 from fast_mda_traceroute.algorithms.utils.stopping_point import (
-    optimal_N,
+    estimate_total_interfaces,
+    reach_prob,
     stopping_point,
 )
-from fast_mda_traceroute.links import get_links_by_ttl
+from fast_mda_traceroute.links import (
+    get_links_by_ttl,
+)
 from fast_mda_traceroute.typing import Link
 from fast_mda_traceroute.utils import is_ipv4
 
@@ -78,6 +81,15 @@ class DiamondMiner:
     def echo_replies(self) -> List[Reply]:
         return [x for x in self.replies if x.echo_reply]
 
+    @property
+    def response_replies(self) -> List[Reply]:
+        return [x for x in self.replies if x.echo_reply or x.time_exceeded]
+
+    def nodes_ttl(self, ttl) -> Set[Reply]:
+        return set(
+            [r.reply_src_addr for r in self.time_exceeded_replies if r.probe_ttl == ttl]
+        )
+
     def nodes_distribution_at_ttl(self, nodes: List[str], ttl: int) -> Dict[str, float]:
         # a routine to fetch the number of replies from a given node at a given TTL
         # NOTE: a node may appear at multiple TTLs
@@ -85,7 +97,7 @@ class DiamondMiner:
             return len(
                 [
                     r
-                    for r in self.time_exceeded_replies
+                    for r in self.replies
                     if r.reply_src_addr == node and r.probe_ttl == ttl
                 ]
             )
@@ -93,19 +105,12 @@ class DiamondMiner:
         # total number of observations of links reaching nodes at the current ttl.
         # since links are stored with the 'near_ttl',
         # we need to fetch them at ttl-1
-        # all_replies = len(self.links_by_ttl.get(ttl - 1, []))
+
         link_dist = {node: node_replies(node, ttl) for node in nodes}
         total = sum(link_dist.values())
         if total:
             link_dist = {k: v / total for k, v in link_dist.items()}
 
-            # if all_replies:
-            #     # compute the probability distribution of nodes at the current ttl
-            #     link_dist = {node: node_replies(node, ttl) for node in nodes}
-            #     logger.debug(
-            #         "link_dist at ttl (abs) %d: %s / total: %d", ttl, link_dist, all_replies
-            #     )
-            #     link_dist = {node: node_replies(node, ttl) / all_replies for node in nodes}
             logger.debug("link_dist at ttl %d: %s", ttl, link_dist)
         else:
             # if we did not observe links at the previous ttl
@@ -128,10 +133,18 @@ class DiamondMiner:
         unresolved = []
         weighted_thresholds = []
 
-        # for every discovered node at this TTL (non None)
-        nodes_at_ttl = set(filter(bool, (x[1] for x in self.links_by_ttl[ttl])))
+        # fetch the nodes at this TTL
+        nodes_at_ttl = set(
+            filter(
+                bool,
+                (r.reply_src_addr for r in self.replies if r.probe_ttl == ttl),
+            )
+        )
+
         if nodes_at_ttl:
             logger.debug("Nodes at TTL %d: %s", ttl, nodes_at_ttl)
+        else:
+            logger.debug("No nodes at TTL %d", ttl)
 
         # fetch the distribution of the nodes at this TTL.
         # this is important to determine what percentage of probes
@@ -139,43 +152,70 @@ class DiamondMiner:
         link_dist = self.nodes_distribution_at_ttl(nodes_at_ttl, ttl)
 
         for node in nodes_at_ttl:
+            if node == self.dst_addr:
+                continue
             # number of unique nodes at the next TTL that share a link with the node
-            n_successors = len(
-                set(
-                    [
-                        x[2]
-                        for x in self.links_by_ttl[ttl]
-                        if x[1] == node and x[2] is not None
-                    ]
-                )
+            successors = set(
+                [
+                    x[2]
+                    for x in self.links_by_ttl[ttl]
+                    if x[1] == node and x[2] is not None
+                ]
             )
 
+            n_successors = len(successors)
+
+            if n_successors == 0 and node != self.dst_addr:
+                # set to 1 if we did not receive any reply from the node
+                logger.debug(
+                    "|> Node %s has no successors and is not destination", node
+                )
+                n_successors = 1
+            else:
+                logger.debug("Detected %d successors for node %s", n_successors, node)
+
             # the minimum number of probes to send to confirm we got all successors
-            # We try to dismiss the hypothesis that there are more successors than we observed
-            logger.debug("Detected %d successors for node %s", n_successors, node)
+            # We try to dismiss the hypothesis that there are more successors
+            # than we observed
+
+            # n_k = stopping_point(max(n_successors, 1), self.failure_probability)
             n_k = stopping_point(n_successors, self.failure_probability)
+            reach_p = reach_prob(n_successors + 1, n_k)
+
+            logger.debug("Stopping point for node %s: %d", node, n_k)
+            logger.debug("Reach probability for node %s: %f", node, reach_p)
 
             # number of outgoing probes that went through the node
-            n_probes = len([x for x in self.links_by_ttl[ttl] if x[1] == node and x[2]])
-            # other = len([x for x in self.links_by_ttl[ttl] if x[0] == node and x[1]])
+            n_probes = len(
+                [x for x in self.links_by_ttl[ttl] if x[1] == node and x[2] is not None]
+            )
+
             logger.debug(
                 "Detected %d outgoing links (probes) for node %s at ttl %d",
                 n_probes,
                 node,
                 ttl,
             )
-            # n_probes = other
 
             logger.debug(
-                "Expected %d probes for node %s at ttl %d and already sent %d",
+                "Expected %d probes for node %s at ttl %d and already sent %d through",
                 n_k,
                 node,
                 ttl,
                 n_probes,
             )
+            if n_successors == 0:
+                logger.debug("|> Node %s has no successors", node)
+                logger.debug("|>   n_k = %d", n_k)
+                logger.debug("|>   n_probes = %d", n_probes)
+                continue
+
+            if n_probes >= n_k:
+                logger.debug("|> Node %s is resolved", node)
+                continue
 
             # if we have not sent enough probes for this node
-            if n_probes < n_k:
+            if n_probes < n_k and n_successors > 0:
                 logger.debug("|> Node %s is therefore unresolved", node)
                 # mark the node as unresolved
                 unresolved.append(node)
@@ -183,12 +223,13 @@ class DiamondMiner:
                 # we store the total number of probes to send to get confirmation:
                 # it is the threshold n_k weighted by how difficult it is to reach
                 # this node, i.e. the distribution of probes that reach this node
-                if optimal_jump:
-                    opti_N = optimal_N(n_probes, n_successors)
+                if optimal_jump and n_probes > 0:
+                    opti_N = estimate_total_interfaces(n_probes, n_successors)
                     opti_n_k = stopping_point(opti_N, self.failure_probability)
                     weighted_thresholds.append(max(n_k, opti_n_k) / link_dist[node])
                 else:
                     weighted_thresholds.append(n_k / link_dist[node])
+
                 logger.debug(
                     "|> At ttl %d, the distribution of nodes is %s", ttl, link_dist
                 )
@@ -236,10 +277,11 @@ class DiamondMiner:
         max_flows_by_ttl = defaultdict(int)
 
         if self.current_round == 1:
-            # NOTE: we cannot reliably infer the destination TTL because it may not be unique.
+            # NOTE: we cannot reliably infer the destination TTL
+            # because it may not be unique.
+            # we could send only one probe per TTL, but that would not
+            # resolve any node.
 
-            # we could send only one probe per TTL, but that would not resolve any node.
-            # max_flow = 1
             max_flow = stopping_point(1, self.failure_probability)
             max_flows_by_ttl = {
                 ttl: max_flow for ttl in range(self.min_ttl, self.max_ttl + 1)
@@ -256,12 +298,21 @@ class DiamondMiner:
         # we take the max of both values.
 
         def combined_max_flow(ttl):
+            if ttl < self.min_ttl or ttl > self.max_ttl:
+                return 1
             return min(
-                max(max_flows_by_ttl[ttl], max_flows_by_ttl.get(ttl - 1, 0)), 2**14
+                max(
+                    max_flows_by_ttl[ttl],
+                    max_flows_by_ttl.get(ttl - 1, 1),
+                ),
+                2**16,
             )
 
         flows_by_ttl = {
-            ttl: range(self.probes_sent[ttl], combined_max_flow(ttl))
+            ttl: range(
+                self.probes_sent[ttl],
+                combined_max_flow(ttl),
+            )
             for ttl in range(self.min_ttl, self.max_ttl + 1)
         }
 
@@ -286,25 +337,7 @@ class DiamondMiner:
                 len(probes_for_ttl),
                 ttl,
             )
-
             self.probes_sent[ttl] += len(probes_for_ttl)
             probes.extend(probes_for_ttl)
 
-        # shuffle(probes)
-        # from tests.fakenet.fakenet import graph_from_links
-
-        # log the current topology discovered so far
-        # links = {
-        #     ttl: list((x, y) for _, x, y in self.links_by_ttl[ttl] if x and y)
-        #     for ttl in range(1, self.max_ttl)
-        # }
-        # filter links to only show the ttl that have links
-        # links = {k: v for k, v in links.items() if v}
-        # if links:
-        #     graph = graph_from_links("4.4.4.4", links)
-        #     logger.debug(">>> Current topology:")
-        #     for start, end in graph.edges:
-        #         logger.debug(">   %s --> %s", start, end)
-        # else:
-        #     logger.debug("No links discovered so far")
         return probes
