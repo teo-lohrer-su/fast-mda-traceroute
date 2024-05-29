@@ -48,13 +48,6 @@ def get_flow_ids(replies: List[Reply], src: str) -> Set[Flow]:
     return flow_ids
 
 
-def get_min_flow_offset(replies: List[Reply], src: str) -> int:
-    min_flow = min(get_flow_ids(replies, src))
-    # generate dummy probes until we match the min_flow
-    flow = None
-    offset = 0
-
-
 @cache
 def get_pairs_by_flow(replies: List[Reply]) -> Dict[Flow, List[Pair]]:
     pairs_by_flow = defaultdict(list)
