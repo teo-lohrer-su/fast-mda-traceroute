@@ -91,18 +91,3 @@ def stopping_point(n_interfaces: int, failure_probability: float) -> int:
         else:
             lower_bound = n_probes
     return upper_bound
-
-
-if __name__ == "__main__":
-    # Examples
-
-    for total_interfaces in range(1, 20):
-        print(f"{stopping_point(total_interfaces, 0.05)}")
-
-    for n_probes in range(1, 20):
-        print("---")
-        for observed_interfaces in range(1, n_probes + 1):
-            estimate = estimate_total_interfaces(
-                n_probes, observed_interfaces, likelihood_threshold=0.95
-            )
-            print(f"n={n_probes} k={observed_interfaces} -> {estimate}")
